@@ -13,6 +13,7 @@ local M = {}
 
 local diagnosticsNamespace = vim.api.nvim_create_namespace("xcodebuild-diagnostics")
 local marksNamespace = vim.api.nvim_create_namespace("xcodebuild-marks")
+local buildDiagnosticsNamespace = vim.api.nvim_create_namespace("xcodebuild-build-diagnostics")
 
 ---@type string|nil
 local requestedRefreshForFile
@@ -228,6 +229,7 @@ end
 function M.clear()
   for _, bufnr in ipairs(util.get_buffers()) do
     vim.diagnostic.reset(diagnosticsNamespace, bufnr)
+    vim.diagnostic.reset(buildDiagnosticsNamespace, bufnr)
     vim.api.nvim_buf_clear_namespace(bufnr, marksNamespace, 0, -1)
     vim.api.nvim_buf_clear_namespace(bufnr, diagnosticsNamespace, 0, -1)
   end
@@ -237,6 +239,79 @@ end
 function M.clear_marks()
   for _, bufnr in ipairs(util.get_buffers()) do
     vim.api.nvim_buf_clear_namespace(bufnr, marksNamespace, 0, -1)
+  end
+end
+
+---Sets build diagnostics (errors, warnings, notes) for all buffers.
+---@param report ParsedReport
+function M.set_build_diagnostics(report)
+  -- Clear existing build diagnostics
+  for _, bufnr in ipairs(util.get_buffers()) do
+    vim.diagnostic.reset(buildDiagnosticsNamespace, bufnr)
+  end
+
+  local diagnosticsByBuffer = {}
+
+  -- Process build errors
+  for _, error in ipairs(report.buildErrors or {}) do
+    if error.filepath then
+      local bufnr = vim.fn.bufnr(error.filepath, false)
+      if bufnr ~= -1 then
+        if not diagnosticsByBuffer[bufnr] then
+          diagnosticsByBuffer[bufnr] = {}
+        end
+        table.insert(diagnosticsByBuffer[bufnr], {
+          lnum = math.max(0, (error.lineNumber or 1) - 1),
+          col = error.columnNumber or 0,
+          severity = vim.diagnostic.severity.ERROR,
+          source = "xcodebuild",
+          message = table.concat(error.message, "\n"),
+        })
+      end
+    end
+  end
+
+  -- Process build warnings
+  for _, warning in ipairs(report.buildWarnings or {}) do
+    if warning.filepath then
+      local bufnr = vim.fn.bufnr(warning.filepath, false)
+      if bufnr ~= -1 then
+        if not diagnosticsByBuffer[bufnr] then
+          diagnosticsByBuffer[bufnr] = {}
+        end
+        table.insert(diagnosticsByBuffer[bufnr], {
+          lnum = math.max(0, (warning.lineNumber or 1) - 1),
+          col = warning.columnNumber or 0,
+          severity = vim.diagnostic.severity.WARN,
+          source = "xcodebuild",
+          message = table.concat(warning.message, "\n"),
+        })
+      end
+    end
+  end
+
+  -- Process build notes
+  for _, note in ipairs(report.buildNotes or {}) do
+    if note.filepath then
+      local bufnr = vim.fn.bufnr(note.filepath, false)
+      if bufnr ~= -1 then
+        if not diagnosticsByBuffer[bufnr] then
+          diagnosticsByBuffer[bufnr] = {}
+        end
+        table.insert(diagnosticsByBuffer[bufnr], {
+          lnum = math.max(0, (note.lineNumber or 1) - 1),
+          col = note.columnNumber or 0,
+          severity = vim.diagnostic.severity.INFO,
+          source = "xcodebuild",
+          message = table.concat(note.message, "\n"),
+        })
+      end
+    end
+  end
+
+  -- Set diagnostics for each buffer
+  for bufnr, diagnostics in pairs(diagnosticsByBuffer) do
+    vim.diagnostic.set(buildDiagnosticsNamespace, bufnr, diagnostics, {})
   end
 end
 
