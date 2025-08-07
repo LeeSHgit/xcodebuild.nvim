@@ -84,6 +84,10 @@ function M.build_project(opts, callback)
 
     quickfix.set(appdata.report)
 
+    -- Set build diagnostics (errors, warnings, notes) for LSP tools
+    local diagnostics = require("xcodebuild.tests.diagnostics")
+    diagnostics.set_build_diagnostics(appdata.report)
+
     notifications.stop_build_timer()
     notifications.send_progress("Processing logs...")
     logsPanel.set_logs(appdata.report, false, function()
