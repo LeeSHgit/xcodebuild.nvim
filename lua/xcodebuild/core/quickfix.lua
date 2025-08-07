@@ -77,6 +77,21 @@ local function insert_build_warnings(list, warnings)
   end
 end
 
+---Inserts build notes into the {list}.
+---@param list QuickfixError[]
+---@param notes ParsedBuildNote[]
+local function insert_build_notes(list, notes)
+  for _, note in ipairs(notes) do
+    table.insert(list, {
+      filename = note.filepath,
+      lnum = note.lineNumber,
+      col = note.columnNumber or 0,
+      text = note.message[1],
+      type = "I",
+    })
+  end
+end
+
 ---Inserts test errors into the {list}.
 ---@param list QuickfixError[]
 ---@param testErrors ParsedTestError[]
@@ -122,6 +137,7 @@ function M.set(report)
 
   if config.show_warnings_on_quickfixlist then
     insert_build_warnings(quickfix, report.buildWarnings or {})
+    insert_build_notes(quickfix, report.buildNotes or {})
   end
 
   if config.show_errors_on_quickfixlist then

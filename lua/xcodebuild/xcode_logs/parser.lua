@@ -490,6 +490,7 @@ local function parse_note(line)
     return
   end
 
+  -- 파일 관련 note 처리 (예: /path/to/file.swift:42:1: note: message)
   local filepath, lineNumber, columnNumber, message =
     string.match(line, "(" .. swiftFilePattern .. "):(%d+):(%d*):? %w*%s*note: (.*)")
 
@@ -500,6 +501,19 @@ local function parse_note(line)
     lineData.message = { message }
     lineData.lineNumber = tonumber(lineNumber) or 0
     lineData.columnNumber = tonumber(columnNumber) or 0
+  else
+    -- 일반 note 처리 (예: note: Building targets in dependency order)
+    local message = string.match(line, "^note: (.*)")
+    if message then
+      lineType = BUILD_NOTE
+      lineData = {
+        filepath = nil,
+        filename = nil,
+        lineNumber = 0,
+        columnNumber = 0,
+        message = { message },
+      }
+    end
   end
 
   debug_print("detected_note", lineData)
@@ -687,7 +701,7 @@ local function process_line(line)
     if lineType ~= TEST_ERROR then
       flush()
     end
-  elseif string.find(line, "^Linting") or string.find(line, "^note:") then
+  elseif string.find(line, "^Linting") then
     flush()
   elseif string.find(line, "%.xcresult$") then
     xcresultFilepath = string.match(line, "%s*(.*[^%.%/]+%.xcresult)")
