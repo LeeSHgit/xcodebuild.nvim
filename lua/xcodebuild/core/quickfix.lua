@@ -82,13 +82,16 @@ end
 ---@param notes ParsedBuildNote[]
 local function insert_build_notes(list, notes)
   for _, note in ipairs(notes) do
-    table.insert(list, {
-      filename = note.filepath,
-      lnum = note.lineNumber,
-      col = note.columnNumber or 0,
-      text = note.message[1],
-      type = "I",
-    })
+    -- filepath가 nil인 경우 quickfix에 추가하지 않음 (일반 note는 quickfix에 표시하지 않음)
+    if note.filepath then
+      table.insert(list, {
+        filename = note.filepath,
+        lnum = note.lineNumber,
+        col = note.columnNumber or 0,
+        text = note.message[1],
+        type = "I",
+      })
+    end
   end
 end
 
@@ -147,7 +150,10 @@ function M.set(report)
   end
 
   table.sort(quickfix, function(a, b)
-    if a.filename == b.filename then
+    local a_filename = a.filename or ""
+    local b_filename = b.filename or ""
+    
+    if a_filename == b_filename then
       if a.lnum == b.lnum then
         return (a.col or 0) < (b.col or 0)
       end
@@ -155,7 +161,7 @@ function M.set(report)
       return a.lnum < b.lnum
     end
 
-    return a.filename < b.filename
+    return a_filename < b_filename
   end)
 
   vim.fn.setqflist(quickfix, "r")
