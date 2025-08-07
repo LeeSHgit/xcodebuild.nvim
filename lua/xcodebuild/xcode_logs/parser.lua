@@ -34,17 +34,24 @@
 ---@field source string|nil
 ---@field message string[]
 
----@class ParsedTestError
----@field filepath string
----@field filename string
----@field lineNumber number
----@field message string[]
-
 ---@class ParsedBuildWarning
 ---@field filepath string
 ---@field filename string
 ---@field lineNumber number
 ---@field columnNumber number
+---@field message string[]
+
+---@class ParsedBuildNote
+---@field filepath string
+---@field filename string
+---@field lineNumber number
+---@field columnNumber number
+---@field message string[]
+
+---@class ParsedTestError
+---@field filepath string
+---@field filename string
+---@field lineNumber number
 ---@field message string[]
 
 ---@class ParsedReport
@@ -67,6 +74,11 @@
 ---quickfix list.
 ---@field buildWarnings ParsedBuildWarning[]
 ---
+---The list of build notes.
+---It will be injected into LSP diagnostics and
+---quickfix list.
+---@field buildNotes ParsedBuildNote[]
+---
 ---The list of errors that occurred during tests
 ---but not in test functions. It could be for
 ---example some crash like force-unwrapping.
@@ -88,6 +100,7 @@ local TEST_START = "TEST_START"
 local TEST_ERROR = "TEST_ERROR"
 local BUILD_ERROR = "BUILD_ERROR"
 local BUILD_WARNING = "BUILD_WARNING"
+local BUILD_NOTE = "BUILD_NOTE"
 
 -- temp fields
 local lineType = BEGIN
@@ -103,6 +116,7 @@ local failedTestsCount = 0
 local output = {}
 local buildErrors = {}
 local buildWarnings = {}
+local buildNotes = {}
 local testErrors = {}
 local usesSwiftTesting = false
 local xcresultFilepath = nil
@@ -249,6 +263,33 @@ local function flush_warning(message)
   lineData = {}
 end
 
+---Sends note data to the report results.
+---
+---If `message` is not nil, this function will only append the message line
+---without flushing the note.
+---@param message string|nil
+local function flush_note(message)
+  debug_print("flush_note", lineData)
+
+  if message then
+    table.insert(lineData.message, message)
+  end
+
+  for _, item in ipairs(buildNotes) do
+    if
+      item.filepath == lineData.filepath
+      and item.lineNumber == lineData.lineNumber
+      and item.message[1] == lineData.message[1]
+    then
+      return
+    end
+  end
+
+  table.insert(buildNotes, lineData)
+  lineType = BEGIN
+  lineData = {}
+end
+
 ---Sends test error data to the report results.
 ---It doesn't clean the `lineData`.
 ---It skips the same  errors.
@@ -285,6 +326,8 @@ local function flush(line)
     flush_error(line)
   elseif lineType == BUILD_WARNING then
     flush_warning(line)
+  elseif lineType == BUILD_NOTE then
+    flush_note(line)
   elseif lineType == TEST_ERROR then
     flush_test(line)
   end
@@ -438,6 +481,28 @@ local function parse_warning(line)
   end
 
   debug_print("detected_warning", lineData)
+end
+
+---@param line string
+---@see ParsedBuildNote
+local function parse_note(line)
+  if string.find(line, xcTestLogPattern) then
+    return
+  end
+
+  local filepath, lineNumber, columnNumber, message =
+    string.match(line, "(" .. swiftFilePattern .. "):(%d+):(%d*):? %w*%s*note: (.*)")
+
+  if filepath and message and util.has_prefix(filepath, vim.fn.getcwd()) then
+    lineType = BUILD_NOTE
+    lineData.filepath = filepath
+    lineData.filename = util.get_filename(filepath)
+    lineData.message = { message }
+    lineData.lineNumber = tonumber(lineNumber) or 0
+    lineData.columnNumber = tonumber(columnNumber) or 0
+  end
+
+  debug_print("detected_note", lineData)
 end
 
 ---@param line string
@@ -611,6 +676,9 @@ local function process_line(line)
   elseif string.find(line, "warning:") then
     flush()
     parse_warning(line)
+  elseif string.find(line, "note:") then
+    flush()
+    parse_note(line)
   elseif string.find(line, "%s*~*%^~*%s*") then
     flush(line)
   elseif string.find(line, "^%s*$") then
@@ -623,7 +691,7 @@ local function process_line(line)
     flush()
   elseif string.find(line, "%.xcresult$") then
     xcresultFilepath = string.match(line, "%s*(.*[^%.%/]+%.xcresult)")
-  elseif lineType == TEST_ERROR or lineType == BUILD_ERROR or lineType == BUILD_WARNING then
+  elseif lineType == TEST_ERROR or lineType == BUILD_ERROR or lineType == BUILD_WARNING or lineType == BUILD_NOTE then
     table.insert(lineData.message, line)
   end
 end
@@ -642,6 +710,7 @@ function M.clear()
   output = {}
   buildErrors = {}
   buildWarnings = {}
+  buildNotes = {}
   testErrors = {}
   usesSwiftTesting = false
   xcresultFilepath = nil
@@ -696,6 +765,7 @@ function M.parse_logs(logLines)
     failedTestsCount = failedTestsCount,
     buildErrors = buildErrors,
     buildWarnings = buildWarnings,
+    buildNotes = buildNotes,
     testErrors = testErrors,
     usesSwiftTesting = usesSwiftTesting,
     xcresultFilepath = xcresultFilepath,
