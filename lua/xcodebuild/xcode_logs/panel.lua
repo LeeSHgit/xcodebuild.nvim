@@ -159,6 +159,35 @@ local function insert_warnings(prettyOutput, warnings)
   table.insert(prettyOutput, "")
 end
 
+---Inserts notes into the {prettyOutput}.
+---@param prettyOutput string[]
+---@param notes ParsedBuildNote[]
+local function insert_notes(prettyOutput, notes)
+  if util.is_empty(notes) then
+    return
+  end
+
+  table.insert(prettyOutput, "Notes:")
+
+  for _, note in ipairs(notes) do
+    if note.filepath then
+      table.insert(
+        prettyOutput,
+        "   " .. note.filepath .. ":" .. (note.lineNumber or 0) .. ":" .. (note.columnNumber or 0)
+      )
+    end
+
+    for index, message in ipairs(note.message) do
+      table.insert(
+        prettyOutput,
+        (index == 1 and not note.filepath) and "   " .. message or "    " .. message
+      )
+    end
+  end
+
+  table.insert(prettyOutput, "")
+end
+
 ---Inserts errors into the {prettyOutput}.
 ---@param prettyOutput string[]
 ---@param buildErrors ParsedBuildError[]
@@ -302,6 +331,10 @@ function M.set_logs(report, isTesting, callback)
 
     if config.show_warnings then
       insert_warnings(prettyOutput, report.buildWarnings)
+    end
+
+    if require("xcodebuild.core.config").options.logs.show_notes then
+      insert_notes(prettyOutput, report.buildNotes)
     end
 
     if util.is_not_empty(report.buildErrors) then

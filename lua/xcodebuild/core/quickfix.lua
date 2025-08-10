@@ -128,6 +128,18 @@ function M.set(report)
     insert_build_errors(quickfix, report.buildErrors or {})
     insert_failing_tests(quickfix, report.tests or {})
     insert_test_errors(quickfix, report.testErrors or {})
+    -- treat build notes as low-severity diagnostics on quickfix if present
+    if config.show_notes_on_quickfixlist and report.buildNotes then
+      for _, note in ipairs(report.buildNotes) do
+        table.insert(quickfix, {
+          filename = note.filepath or (note.source or ""),
+          lnum = note.lineNumber or 0,
+          col = note.columnNumber or 0,
+          text = note.message and note.message[1] or "",
+          type = "I", -- info
+        })
+      end
+    end
   end
 
   table.sort(quickfix, function(a, b)

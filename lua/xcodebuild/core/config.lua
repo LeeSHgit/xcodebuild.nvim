@@ -42,6 +42,7 @@ local defaults = {
     only_summary = false, -- if true logs won't be displayed, just xcodebuild.nvim summary
     live_logs = true, -- if true logs will be updated in real-time
     show_warnings = true, -- show warnings in logs summary
+    show_notes = true, -- show notes in logs summary (informational)
     notify = function(message, severity) -- function to show notifications from this module (like "Build Failed")
       vim.notify(message, severity)
     end,
@@ -68,6 +69,7 @@ local defaults = {
   quickfix = {
     show_errors_on_quickfixlist = true, -- add build/test errors to quickfix list
     show_warnings_on_quickfixlist = true, -- add build warnings to quickfix list
+    show_notes_on_quickfixlist = true, -- add build notes to quickfix list
   },
   test_explorer = {
     enabled = true, -- enable Test Explorer
