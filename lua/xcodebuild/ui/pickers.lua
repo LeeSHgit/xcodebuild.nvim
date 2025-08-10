@@ -65,6 +65,10 @@ local function get_destination_name(destination)
     return util.trim(name) .. (destination.os and " (" .. destination.os .. ")" or "")
   end
 
+  if destination.platform and isSimulator then
+    name = util.trim(name) .. " (Simulator)"
+  end
+
   if destination.platform and not isSimulator then
     name = util.trim(name .. " " .. destination.platform)
   end
