@@ -80,6 +80,12 @@ function M.get_destination_name(destination)
   end
   if destination.os then
     name = name .. " (" .. destination.os .. ")"
+    if isSimulator then
+      name = name .. " (Simulator)"
+    end
+  end
+  if isSimulator and not destination.os then
+    name = util.trim(name) .. " (Simulator)"
   end
   if destination.variant then
     name = name .. " (" .. destination.variant .. ")"
